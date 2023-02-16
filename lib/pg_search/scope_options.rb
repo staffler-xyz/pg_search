@@ -37,8 +37,11 @@ module PgSearch
 
       def with_pg_search_highlight
         scope = self
-        scope = scope.select("#{table_name}.*") unless scope.select_values.any?
-        scope.select("(#{highlight}) AS pg_search_highlight")
+        scope.select(pg_search_highlight_field)
+      end
+
+      def pg_search_highlight_field
+        "(#{highlight}) AS pg_search_highlight, #{table_name}.*"
       end
 
       def highlight
@@ -84,7 +87,6 @@ module PgSearch
         .select("#{primary_key} AS pg_search_id")
         .select("#{rank} AS rank")
         .joins(subquery_join)
-        .where(config.subquery_condition)
         .where(conditions)
         .limit(nil)
         .offset(nil)

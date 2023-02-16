@@ -40,7 +40,8 @@ module PgSearch
 
         headline_options
           .merge(deprecated_headline_options)
-          .filter_map { |key, value| "#{key} = #{value}" unless value.nil? }
+          .map { |key, value| "#{key} = #{value}" unless value.nil? }
+          .compact
           .join(", ")
       end
 
@@ -94,7 +95,7 @@ module PgSearch
         end
       end
 
-      DISALLOWED_TSQUERY_CHARACTERS = /['?\\:‘’ʻʼ]/.freeze
+      DISALLOWED_TSQUERY_CHARACTERS = /['?\\:‘’]/.freeze
 
       def tsquery_for_term(unsanitized_term)
         if options[:negation] && unsanitized_term.start_with?("!")
@@ -131,7 +132,7 @@ module PgSearch
       def tsquery
         return "''" if query.blank?
 
-        query_terms = query.split.compact
+        query_terms = query.split(" ").compact
         tsquery_terms = query_terms.map { |term| tsquery_for_term(term) }
         tsquery_terms.join(options[:any_word] ? ' || ' : ' && ')
       end

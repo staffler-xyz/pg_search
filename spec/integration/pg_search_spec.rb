@@ -140,22 +140,6 @@ describe "an Active Record model which includes PgSearch" do
             }.to raise_error(ArgumentError, /against/)
           end
         end
-
-        context "when a tsvector column is specified" do
-          it "does not raise an exception when invoked" do
-            ModelWithPgSearch.pg_search_scope :with_unknown_ignoring, {
-              using: {
-                tsearch: {
-                  tsvector_column: "tsv"
-                }
-              }
-            }
-
-            expect {
-              ModelWithPgSearch.with_unknown_ignoring("foo")
-            }.not_to raise_error
-          end
-        end
       end
     end
   end
@@ -176,7 +160,7 @@ describe "an Active Record model which includes PgSearch" do
           expect(results).to include(included)
           expect(results).not_to include(excluded)
 
-          expect(results.first.attributes.key?('content')).to be false
+          expect(results.first.attributes.key?('content')).to eq false
 
           expect(results.select { |record| record.title == "bar" }).to eq [included]
           expect(results.reject { |record| record.title == "bar" }).to be_empty
@@ -193,7 +177,7 @@ describe "an Active Record model which includes PgSearch" do
           expect(results).to include(included)
           expect(results).not_to include(excluded)
 
-          expect(results.first.attributes.key?('content')).to be false
+          expect(results.first.attributes.key?('content')).to eq false
 
           expect(results.select { |record| record.title == "bar" }).to eq [included]
           expect(results.reject { |record| record.title == "bar" }).to be_empty
@@ -210,7 +194,7 @@ describe "an Active Record model which includes PgSearch" do
           expect(results).to include(included)
           expect(results).not_to include(excluded)
 
-          expect(results.first.attributes.key?('content')).to be false
+          expect(results.first.attributes.key?('content')).to eq false
 
           expect(results.select { |record| record.title == "bar" }).to eq [included]
           expect(results.reject { |record| record.title == "bar" }).to be_empty
@@ -423,15 +407,6 @@ describe "an Active Record model which includes PgSearch" do
         expect(results).to eq([winner, loser])
       end
 
-      it 'preserves column selection when with_pg_search_rank is chained after a select()' do
-        loser = ModelWithPgSearch.create!(title: 'foo', content: 'bar')
-
-        results = ModelWithPgSearch.search_content('bar').select(:content).with_pg_search_rank
-
-        expect(results.length).to be 1
-        expect(results.first.as_json.keys).to contain_exactly('id', 'content', 'pg_search_rank')
-      end
-
       it 'allows pg_search_rank along with a join' do
         parent_1 = ParentModel.create!(id: 98)
         parent_2 = ParentModel.create!(id: 99)
@@ -477,7 +452,7 @@ describe "an Active Record model which includes PgSearch" do
 
       it "accepts non-string queries and calls #to_s on them" do
         foo = ModelWithPgSearch.create!(content: "foo")
-        not_a_string = instance_double(Object, to_s: "foo")
+        not_a_string = instance_double("Object", to_s: "foo")
         expect(ModelWithPgSearch.search_content(not_a_string)).to eq([foo])
       end
 
@@ -639,7 +614,7 @@ describe "an Active Record model which includes PgSearch" do
       describe "highlighting" do
         before do
           ["Strip Down", "Down", "Down and Out", "Won't Let You Down"].each do |name|
-            ModelWithPgSearch.create! title: 'Just a title', content: name
+            ModelWithPgSearch.create! content: name
           end
         end
 
@@ -659,12 +634,6 @@ describe "an Active Record model which includes PgSearch" do
             result = ModelWithPgSearch.search_content("Let").with_pg_search_highlight.first
 
             expect(result.pg_search_highlight).to eq("Won't <b>Let</b> You Down")
-          end
-
-          it 'preserves column selection when with_pg_search_highlight is chained after a select()' do
-            result = ModelWithPgSearch.search_content("Let").select(:content).with_pg_search_highlight.first
-
-            expect(result.as_json.keys).to contain_exactly('id', 'content', 'pg_search_highlight')
           end
         end
 
@@ -993,13 +962,13 @@ describe "an Active Record model which includes PgSearch" do
 
         it "passes the custom configuration down to the specified feature" do
           tsearch_feature = instance_double(
-            PgSearch::Features::TSearch,
+            "PgSearch::Features::TSearch",
             conditions: Arel::Nodes::Grouping.new(Arel.sql("1 = 1")),
             rank: Arel::Nodes::Grouping.new(Arel.sql("1.0"))
           )
 
           trigram_feature = instance_double(
-            PgSearch::Features::Trigram,
+            "PgSearch::Features::Trigram",
             conditions: Arel::Nodes::Grouping.new(Arel.sql("1 = 1")),
             rank: Arel::Nodes::Grouping.new(Arel.sql("1.0"))
           )
@@ -1091,7 +1060,7 @@ describe "an Active Record model which includes PgSearch" do
       end
 
       it 'concats tsvector columns' do
-        expected = "#{ModelWithTsvector.quoted_table_name}.\"content_tsvector\" || " \
+        expected = "#{ModelWithTsvector.quoted_table_name}.\"content_tsvector\" || "\
                    "#{ModelWithTsvector.quoted_table_name}.\"message_tsvector\""
 
         expect(ModelWithTsvector.search_by_multiple_tsvector_columns("something").to_sql).to include(expected)
@@ -1174,16 +1143,11 @@ describe "an Active Record model which includes PgSearch" do
       end
 
       context "when the query includes accents" do
-        let(:term) { "L#{%w[‘ ’ ʻ ʼ].sample}Content" }
-        let(:included) { ModelWithPgSearch.create!(title: "Weird #{term}") }
-        let(:results) { ModelWithPgSearch.search_title_without_accents(term) }
-
-        before do
-          ModelWithPgSearch.create!(title: 'FooBar')
-        end
-
         it "does not create an erroneous tsquery expression" do
-          expect(results).to contain_exactly(included)
+          included = ModelWithPgSearch.create!(title: "Weird L‘Content")
+
+          results = ModelWithPgSearch.search_title_without_accents("L‘Content")
+          expect(results).to eq([included])
         end
       end
     end

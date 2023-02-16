@@ -11,10 +11,4 @@ RuboCop::RakeTask.new do |t|
   t.options = %w[--display-cop-names]
 end
 
-desc "Check test coverage"
-task :undercover do
-  system("git fetch --unshallow") if ENV["CI"]
-  exit(1) unless system("bin/undercover --compare origin/master")
-end
-
-task default: %w[spec rubocop undercover]
+task default: %w[spec rubocop]

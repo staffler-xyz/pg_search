@@ -59,10 +59,6 @@ module PgSearch
       options[:ranked_by]
     end
 
-    def subquery_condition
-      options[:subquery_condition]
-    end
-
     def features
       Array(options[:using])
     end
@@ -88,7 +84,7 @@ module PgSearch
     end
 
     VALID_KEYS = %w[
-      against ranked_by ignoring using query associated_against order_within_rank subquery_condition
+      against ranked_by ignoring using query associated_against order_within_rank
     ].map(&:to_sym)
 
     VALID_VALUES = {
@@ -96,11 +92,8 @@ module PgSearch
     }.freeze
 
     def assert_valid_options(options)
-      unless options[:against] || options[:associated_against] || using_tsvector_column?(options[:using])
-        raise(
-          ArgumentError,
-          "the search scope #{@name} must have :against, :associated_against, or :tsvector_column in its options"
-        )
+      unless options[:against] || options[:associated_against]
+        raise ArgumentError, "the search scope #{@name} must have :against or :associated_against in its options"
       end
 
       options.assert_valid_keys(VALID_KEYS)
@@ -110,13 +103,6 @@ module PgSearch
           raise ArgumentError, ":#{key} cannot accept #{value}" unless values_for_key.include?(value)
         end
       end
-    end
-
-    def using_tsvector_column?(options)
-      return unless options.is_a?(Hash)
-
-      options.dig(:dmetaphone, :tsvector_column).present? ||
-        options.dig(:tsearch, :tsvector_column).present?
     end
   end
 end
