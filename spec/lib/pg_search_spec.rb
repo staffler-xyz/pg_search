@@ -2,9 +2,9 @@
 
 require "spec_helper"
 
-# For Active Record 5.x and 6.0, the association reflection's cache needs be cleared
+# For Active Record 5.x, the association reflection's cache needs be cleared
 # because we're stubbing the related constants.
-if ActiveRecord::VERSION::MAJOR == 5 || (ActiveRecord::VERSION::MAJOR == 6 && ActiveRecord::VERSION::MINOR == 0)
+if ActiveRecord::VERSION::MAJOR == 5
   def clear_searchable_cache
     PgSearch::Document.reflect_on_association(:searchable).clear_association_scope_cache
   end
@@ -21,8 +21,8 @@ describe PgSearch do
     describe "delegation to PgSearch::Document.search" do
       subject { described_class.multisearch(query) }
 
-      let(:query) { instance_double("String", "query") }
-      let(:relation) { instance_double("ActiveRecord::Relation", "relation") }
+      let(:query) { instance_double(String, "query") }
+      let(:relation) { instance_double(ActiveRecord::Relation, "relation") }
 
       before do
         allow(PgSearch::Document).to receive(:search).with(query).and_return(relation)
