@@ -1,10 +1,7 @@
 # [pg_search](http://github.com/Casecommons/pg_search/)
 
 [![Gem Version](https://img.shields.io/gem/v/pg_search.svg?style=flat)](https://rubygems.org/gems/pg_search)
-[![Build Status](https://secure.travis-ci.org/Casecommons/pg_search.svg?branch=master)](https://travis-ci.org/Casecommons/pg_search)
-[![Maintainability](https://api.codeclimate.com/v1/badges/ae1a7c021e473e9b2486/maintainability)](https://codeclimate.com/github/Casecommons/pg_search/maintainability)
-[![Test Coverage](https://codeclimate.com/github/Casecommons/pg_search/badges/coverage.svg)](https://codeclimate.com/github/Casecommons/pg_search/coverage)
-[![Inline docs](http://inch-ci.org/github/Casecommons/pg_search.svg?branch=master&style=flat)](http://inch-ci.org/github/Casecommons/pg_search)
+[![Build Status](https://github.com/Casecommons/pg_search/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Casecommons/pg_search/actions/workflows/ci.yml)
 [![Join the chat at https://gitter.im/Casecommons/pg_search](https://img.shields.io/badge/gitter-join%20chat-blue.svg)](https://gitter.im/Casecommons/pg_search?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## DESCRIPTION
@@ -12,12 +9,12 @@
 PgSearch builds named scopes that take advantage of PostgreSQL's full text
 search.
 
-Read the blog post introducing PgSearch at https://content.pivotal.io/blog/pg-search-how-i-learned-to-stop-worrying-and-love-postgresql-full-text-search
+Read the blog post introducing PgSearch at https://tanzu.vmware.com/content/blog/pg-search-how-i-learned-to-stop-worrying-and-love-postgresql-full-text-search
 
 ## REQUIREMENTS
 
-*   Ruby 2.5+
-*   ActiveRecord 5.2+
+*   Ruby 3.0+
+*   Active Record 6.1+
 *   PostgreSQL 9.2+
 *   [PostgreSQL extensions](https://github.com/Casecommons/pg_search/wiki/Installing-PostgreSQL-Extensions) for certain features
 
@@ -51,7 +48,7 @@ To add PgSearch to an Active Record model, simply include the PgSearch module.
 class Shape < ActiveRecord::Base
   include PgSearch::Model
 end
-```    
+```
 
 ### Contents
 * [Multi-search vs. search scopes](#multi-search-vs-search-scopes)
@@ -201,17 +198,22 @@ problematic_record.published?     # => true
 PgSearch.multisearch("timestamp") # => Includes problematic_record
 ```
 
-#### More Options 
+#### More Options
 
 **Conditionally update pg_search_documents**
 
-You can specify an `:update_if` parameter to conditionally update pg_search documents. For example:
+You can also use the `:update_if` option to pass a Proc or method name to call
+to determine whether or not a particular record should be updated.
+
+Note that the Proc or method name is called in an `after_save` hook, so if you
+are relying on ActiveRecord dirty flags use `*_previously_changed?`.
 
 ```ruby
-multisearchable(
-    against: [:body],
-    update_if: :body_changed?
-  )
+class Message < ActiveRecord::Base
+  include PgSearch::Model
+  multisearchable against: [:body],
+                  update_if: :body_previously_changed?
+end
 ```
 
 **Specify additional attributes to be saved on the pg_search_documents table**
@@ -244,7 +246,8 @@ This allows much faster searches without joins later on by doing something like:
 PgSearch.multisearch(params['search']).where(author_id: 2)
 ```
 
-*NOTE: You must currently manually call `record.update_pg_search_document` for the additional attribute to be included in the pg_search_documents table*
+*NOTE: You must currently manually call `record.update_pg_search_document` for
+the additional attribute to be included in the pg_search_documents table*
 
 #### Multi-search associations
 
@@ -319,7 +322,7 @@ To remove all of the documents for a given class, you can simply delete all of
 the PgSearch::Document records.
 
 ```ruby
-PgSearch::Document.delete_all(searchable_type: "Animal")
+PgSearch::Document.delete_by(searchable_type: "Animal")
 ```
 
 To regenerate the documents for a given class, run:
@@ -338,6 +341,13 @@ like so:
 PgSearch::Multisearch.rebuild(Product, clean_up: false)
 ```
 
+```rebuild``` runs inside a single transaction. To run outside of a transaction,
+you can pass ```transactional: false``` like so:
+
+```ruby
+PgSearch::Multisearch.rebuild(Product, transactional: false)
+```
+
 Rebuild is also available as a Rake task, for convenience.
 
     $ rake pg_search:multisearch:rebuild[BlogPost]
@@ -349,15 +359,11 @@ pg_search_documents tables. The following will set the schema search path to
 
     $ rake pg_search:multisearch:rebuild[BlogPost,my_schema]
 
-For models that are multisearchable :against methods that directly map to
+For models that are multisearchable `:against` methods that directly map to
 Active Record attributes, an efficient single SQL statement is run to update
-the pg_search_documents table all at once. However, if you call any dynamic
-methods in :against, the following strategy will be used:
-
-```ruby
-PgSearch::Document.delete_all(searchable_type: "Ingredient")
-Ingredient.find_each { |record| record.update_pg_search_document }
-```
+the `pg_search_documents` table all at once. However, if you call any dynamic
+methods in `:against` then `update_pg_search_document` will be called on the
+individual records being indexed in batches.
 
 You can also provide a custom implementation for rebuilding the documents by
 adding a class method called `rebuild_pg_search_documents` to your model.
@@ -383,7 +389,7 @@ class Movie < ActiveRecord::Base
      INSERT INTO pg_search_documents (searchable_type, searchable_id, content, created_at, updated_at)
        SELECT 'Movie' AS searchable_type,
               movies.id AS searchable_id,
-              (movies.name || ' ' || directors.name) AS content,
+              CONCAT_WS(' ', movies.name, directors.name) AS content,
               now() AS created_at,
               now() AS updated_at
        FROM movies
@@ -393,6 +399,7 @@ class Movie < ActiveRecord::Base
   end
 end
 ```
+**Note:** If using PostgreSQL before 9.1, replace the `CONCAT_WS()` function call with double-pipe concatenation, eg. `(movies.name || ' ' || directors.name)`. However, now be aware that if *any* of the joined values is NULL then the final `content` value will also be NULL, whereas `CONCAT_WS()` will selectively ignore NULL values.
 
 #### Disabling multi-search indexing temporarily
 
@@ -545,6 +552,21 @@ class Beer < ActiveRecord::Base
 end
 ```
 
+Here's an example if you pass multiple :using options with additional configurations.
+
+```ruby
+class Beer < ActiveRecord::Base
+  include PgSearch::Model
+  pg_search_scope :search_name,
+  against: :name,
+  using: {
+      :trigram => {},
+      :dmetaphone => {},
+      :tsearch => { :prefix => true }
+  }
+end
+```
+
 The currently implemented features are
 
 *   :tsearch - [Full text search](http://www.postgresql.org/docs/current/static/textsearch-intro.html), which is built-in to PostgreSQL
@@ -657,7 +679,7 @@ Animal.with_name_matching("fish !red !blue") # => [one_fish, two_fish]
 
 PostgreSQL full text search also support multiple dictionaries for stemming.
 You can learn more about how dictionaries work by reading the [PostgreSQL
-documention](http://www.postgresql.org/docs/current/static/textsearch-dictionaries.html). 
+documention](http://www.postgresql.org/docs/current/static/textsearch-dictionaries.html).
 If you use one of the language dictionaries, such as "english",
 then variants of words (e.g. "jumping" and "jumped") will match each other. If
 you don't want stemming, you should pick the "simple" dictionary which does
@@ -679,12 +701,12 @@ class BoringTweet < ActiveRecord::Base
                   }
 end
 
-sleepy = BoringTweet.create! text: "I snoozed my alarm for fourteen hours today. I bet I can beat that tomorrow! #sleepy"
+sleep = BoringTweet.create! text: "I snoozed my alarm for fourteen hours today. I bet I can beat that tomorrow! #sleep"
 sleeping = BoringTweet.create! text: "You know what I like? Sleeping. That's what. #enjoyment"
-sleeper = BoringTweet.create! text: "Have you seen Woody Allen's movie entitled Sleeper? Me neither. #boycott"
+sleeps = BoringTweet.create! text: "In the jungle, the mighty jungle, the lion sleeps #tonight"
 
-BoringTweet.kinda_matching("sleeping") # => [sleepy, sleeping, sleeper]
-BoringTweet.literally_matching("sleeping") # => [sleeping]
+BoringTweet.kinda_matching("sleeping") # => [sleep, sleeping, sleeps]
+BoringTweet.literally_matching("sleeps") # => [sleeps]
 ```
 
 ##### :normalization
@@ -829,7 +851,7 @@ used for searching.
 Double Metaphone support is currently available as part of the [fuzzystrmatch
 extension](http://www.postgresql.org/docs/current/static/fuzzystrmatch.html)
 that must be installed before this feature can be used. In addition to the
-extension, you must install a utility function into your database. To generate 
+extension, you must install a utility function into your database. To generate
 and run a migration for this, run:
 
     $ rails g pg_search:migration:dmetaphone
@@ -864,7 +886,7 @@ Trigram search works by counting how many three-letter substrings (or
 Trigram search has some ability to work even with typos and misspellings in
 the query or text.
 
-Trigram support is currently available as part of the 
+Trigram support is currently available as part of the
 [pg_trgm extension](http://www.postgresql.org/docs/current/static/pgtrgm.html) that must be installed before this
 feature can be used.
 
@@ -928,7 +950,7 @@ Vegetable.strictly_spelled_like("collyflower") # => []
 Allows you to match words in longer strings.
 By default, trigram searches use `%` or `similarity()` as a similarity value.
 Set `word_similarity` to `true` to opt for `<%` and `word_similarity` instead.
-This causes the trigram search to use the similarity of the query term 
+This causes the trigram search to use the similarity of the query term
 and the word with greatest similarity.
 
 ```ruby
@@ -954,12 +976,12 @@ Sentence.similarity_like("word") # => []
 Sentence.word_similarity_like("word") # => [sentence]
 ```
 
-### Limiting Fields When Combining Features 
+### Limiting Fields When Combining Features
 
-Sometimes when doing queries combining different features you 
-might want to searching against only some of the fields with certain features.
+Sometimes when doing queries combining different features you
+might want to search against only some of the fields with certain features.
 For example perhaps you want to only do a trigram search against the shorter fields
-so that you don't need to reduce the threshold excessively. You can specify 
+so that you don't need to reduce the threshold excessively. You can specify
 which fields using the 'only' option:
 
 ```ruby
@@ -978,7 +1000,7 @@ class Image < ActiveRecord::Base
 end
 ```
 
-Now you can succesfully retrieve an Image with a file_name: 'image_foo.jpg' 
+Now you can succesfully retrieve an Image with a file_name: 'image_foo.jpg'
 and long_description: 'This description is so long that it would make a trigram search
 fail any reasonable threshold limit' with:
 
@@ -1196,5 +1218,5 @@ for discussing pg_search and other Casebook PBC open source projects.
 
 ## LICENSE
 
-Copyright © 2010–2019 [Casebook PBC](http://www.casebook.net).
+Copyright © 2010–2022 [Casebook PBC](http://www.casebook.net).
 Licensed under the MIT license, see [LICENSE](/LICENSE) file.

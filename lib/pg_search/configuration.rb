@@ -84,7 +84,7 @@ module PgSearch
     attr_reader :options
 
     def default_options
-      { using: :tsearch }
+      {using: :tsearch}
     end
 
     VALID_KEYS = %w[

@@ -10,10 +10,12 @@ else
 end
 
 begin
-  ActiveRecord::Base.establish_connection(adapter: 'postgresql',
-                                          database: 'pg_search_test',
-                                          username: (ENV["TRAVIS"] ? "postgres" : ENV["USER"]),
-                                          min_messages: 'warning')
+  connection_options = {adapter: "postgresql", database: "pg_search_test", min_messages: "warning"}
+  if ENV["CI"]
+    connection_options[:username] = "postgres"
+    connection_options[:password] = "postgres"
+  end
+  ActiveRecord::Base.establish_connection(connection_options)
   connection = ActiveRecord::Base.connection
   connection.execute("SELECT 1")
 rescue ERROR_CLASS, ActiveRecord::NoDatabaseError => e
@@ -38,7 +40,7 @@ def install_extension(name)
   return unless extension.none?
 
   connection.execute "CREATE EXTENSION #{name};"
-rescue StandardError => e
+rescue => e
   at_exit do
     puts "-" * 80
     puts "Please install the #{name} extension"
@@ -50,7 +52,7 @@ end
 def install_extension_if_missing(name, query, expected_result)
   result = ActiveRecord::Base.connection.select_value(query)
   raise "Unexpected output for #{query}: #{result.inspect}" unless result.casecmp(expected_result).zero?
-rescue StandardError
+rescue
   install_extension(name)
 end
 
@@ -60,7 +62,7 @@ install_extension_if_missing("fuzzystrmatch", "SELECT dmetaphone('foo')", "f")
 
 def load_sql(filename)
   connection = ActiveRecord::Base.connection
-  file_contents = File.read(File.join(File.dirname(__FILE__), '..', '..', 'sql', filename))
+  file_contents = File.read(File.join(File.dirname(__FILE__), "..", "..", "sql", filename))
   connection.execute(file_contents)
 end
 

@@ -13,7 +13,7 @@ else
   end
 end
 
-# rubocop:disable RSpec/NestedGroups
+# standard:disable RSpec/NestedGroups
 describe PgSearch do
   describe ".multisearch" do
     with_table "pg_search_documents", &DOCUMENTS_SCHEMA
@@ -49,7 +49,7 @@ describe PgSearch do
         end
       end
 
-      let!(:soundalike_record) { MultisearchableModel.create!(title: 'foning') }
+      let!(:soundalike_record) { MultisearchableModel.create!(title: "foning") }
       let(:query) { "Phoning" }
 
       it { is_expected.to include(soundalike_record) }
@@ -65,9 +65,9 @@ describe PgSearch do
         allow(described_class).to receive(:multisearch_options) do
           lambda do |query, soundalike|
             if soundalike
-              { using: :dmetaphone, query: query }
+              {using: :dmetaphone, query: query}
             else
-              { query: query }
+              {query: query}
             end
           end
         end
@@ -83,7 +83,7 @@ describe PgSearch do
         end
       end
 
-      let!(:soundalike_record) { MultisearchableModel.create!(title: 'foning') }
+      let!(:soundalike_record) { MultisearchableModel.create!(title: "foning") }
       let(:query) { "Phoning" }
 
       context "with soundalike true" do
@@ -103,8 +103,8 @@ describe PgSearch do
       context "with standard type column" do
         with_model :SuperclassModel do
           table do |t|
-            t.text 'content'
-            t.string 'type'
+            t.text "content"
+            t.string "type"
           end
         end
 
@@ -149,7 +149,7 @@ describe PgSearch do
           expect(results.size).to eq(SearchableSubclassModel.count)
         end
 
-        # rubocop:disable RSpec/MultipleExpectations
+        # standard:disable RSpec/MultipleExpectations
         specify "reindexing works" do
           NonSearchableSubclassModel.create!(content: "foo bar")
           NonSearchableSubclassModel.create!(content: "baz")
@@ -171,7 +171,7 @@ describe PgSearch do
           expect(PgSearch::Document.first.searchable.class).to be SearchableSubclassModel
           expect(PgSearch::Document.first.searchable).to eq expected
         end
-        # rubocop:enable RSpec/MultipleExpectations
+        # standard:enable RSpec/MultipleExpectations
 
         it "reindexing searchable STI doesn't clobber other related STI models" do
           SearchableSubclassModel.create!(content: "baz")
@@ -191,12 +191,12 @@ describe PgSearch do
       context "with custom type column" do
         with_model :SuperclassModel do
           table do |t|
-            t.text 'content'
-            t.string 'inherit'
+            t.text "content"
+            t.string "inherit"
           end
 
           model do
-            self.inheritance_column = 'inherit'
+            self.inheritance_column = "inherit"
           end
         end
 
@@ -254,7 +254,7 @@ describe PgSearch do
           multisearch_enabled_inside = described_class.multisearch_enabled?
           raise
         end
-      rescue StandardError
+      rescue
       end
       multisearch_enabled_after = described_class.multisearch_enabled?
 
@@ -263,7 +263,7 @@ describe PgSearch do
       expect(multisearch_enabled_after).to be(true)
     end
 
-    # rubocop:disable RSpec/ExampleLength
+    # standard:disable RSpec/ExampleLength
     it "does not disable multisearch on other threads" do
       values = Queue.new
       sync = Queue.new
@@ -288,7 +288,7 @@ describe PgSearch do
       expect(multisearch_enabled_inside).to be(true)
       expect(multisearch_enabled_after).to be(true)
     end
-    # rubocop:enable RSpec/ExampleLength
+    # standard:enable RSpec/ExampleLength
   end
 end
-# rubocop:enable RSpec/NestedGroups
+# standard:enable RSpec/NestedGroups
