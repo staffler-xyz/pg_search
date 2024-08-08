@@ -84,7 +84,6 @@ module PgSearch
       relation = block_given? ? yield(relation) : relation
 
       relation = relation
-        .unscoped
         .select("#{primary_key} AS pg_search_id")
         .select("#{rank} AS rank")
         .joins(subquery_join)
